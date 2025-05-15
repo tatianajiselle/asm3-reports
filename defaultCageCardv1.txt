@@ -1,0 +1,134 @@
+SELECT
+  a.ID AS aid,
+  a.AnimalName AS animalname,
+  a.ShelterCode AS sheltercode,
+  a.DateOfBirth AS dateofbirth,
+  a.AnimalAge,
+  s.SpeciesName AS speciesname,
+  atp.AnimalType AS animaltype,
+  a.BreedName AS breedname,
+  a.IdentichipNumber AS identichipnumber,
+  il.LocationName AS locationname,
+  ab.InDateTime AS indatetime,
+  ab.OutDateTime AS outdatetime,
+  ab.Days AS days,
+  o.OwnerName AS ownername,
+  o.ID AS oid,
+  o.OwnerAddress AS owneraddress,
+  o.OwnerTown AS ownertown,
+  o.OwnerCounty AS ownercounty,
+  o.OwnerPostcode AS ownerpostcode,
+  o.EmailAddress AS email,
+  o.HomeTelephone AS homephone,
+  o.MobileTelephone AS mobilephone,
+  (SELECT Sex FROM lksex WHERE ID = a.sex) AS thesex,
+  (COALESCE(ab.DailyFee, 0) * COALESCE(ab.Days, 0)) AS cost,
+
+  -- Veterinarian info from `additional` table
+  (
+    SELECT af.Value
+    FROM additional af
+    WHERE af.LinkID = a.ID AND af.LinkType = 3 AND af.AdditionalFieldID = 50
+    LIMIT 1
+  ) AS veterinarian,
+
+  -- Simplified medication string
+STRING_AGG(
+  am.TreatmentName || 
+  CASE 
+    WHEN COALESCE(am.Dosage, '') <> '' THEN ' (' || am.Dosage || ')' 
+    ELSE '' 
+  END,
+  '<br />'
+) AS medications
+
+
+FROM animal a
+INNER JOIN animalboarding ab ON a.ID = ab.AnimalID
+INNER JOIN species s ON a.SpeciesID = s.ID
+INNER JOIN animaltype atp ON a.AnimalTypeID = atp.ID
+INNER JOIN owner o ON ab.OwnerID = o.ID
+INNER JOIN internallocation il ON ab.ShelterLocation = il.ID
+LEFT JOIN animalmedical am ON am.AnimalID = a.ID
+
+WHERE a.ID = $ASK ANIMAL$
+
+GROUP BY
+  a.ID, a.AnimalName, a.ShelterCode, a.DateOfBirth, a.AnimalAge,
+  s.SpeciesName, atp.AnimalType, a.BreedName, a.IdentichipNumber,
+  il.LocationName, ab.InDateTime, ab.OutDateTime, ab.Days,
+  o.OwnerName, o.ID, o.OwnerAddress, o.OwnerTown, o.OwnerCounty, o.OwnerPostcode,
+  o.EmailAddress, o.HomeTelephone, o.MobileTelephone, ab.DailyFee, a.sex
+
+ORDER BY atp.AnimalType, ab.InDateTime, a.AnimalName;
+
+$$HEADER
+<table width="700" border="0">
+<tr>
+  <td width="700" align="center">
+    <img src="image?db=nl2089&amp;mode=dbfs&amp;id=/reports/logo.jpg" height="80" alt="Logo" />
+  </td>
+</tr>
+</table>
+HEADER$$
+
+
+$$BODY
+<table width="700" border="1" cellpadding="4" cellspacing="0">
+
+<tr>
+  <td width="350" colspan="2">
+    <b>Name:</b><br />
+    <font size="10">$animalname</font>
+  </td>
+  <td width="175">
+    <b>Sex:</b><br />
+    $theSex
+  </td>
+  <td width="175">
+    <b>Breed:</b><br />
+    $breedname
+  </td>
+</tr>
+
+<tr>
+  <td width="350" colspan="2">
+    <b>Boarding Start:</b><br />
+    $indatetime
+  </td>
+  <td width="350" colspan="2">
+    <b>Boarding End:</b><br />
+    $outdatetime
+  </td>
+</tr>
+
+<tr>
+  <td width="700" colspan="4">
+    <font size="3">
+    <b>Owner:</b> $ownername<br />
+    <b>Phone:</b> $homephone / $mobilephone<br />
+    <b>Email:</b> $email<br /><br />
+    <b>Veterinarian:</b> $veterinarian
+    </font>
+  </td>
+</tr>
+
+<tr>
+  <td width="700" colspan="4">
+    <img height="200" src="{IMAGE.$aid}" />
+  </td>
+</tr>
+
+<tr>
+  <td width="700" colspan="4">
+    <b>Medications:</b><br />
+    <font size="3">$medications</font>
+  </td>
+</tr>
+
+</table>
+<p>&nbsp;</p>
+BODY$$
+
+$$FOOTER
+FOOTER$$
